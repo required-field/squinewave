@@ -1,0 +1,26 @@
+class:: Squine
+summary:: Squinewave oscillator
+related:: TODO
+categories:: UGens>TODO
+
+description::
+
+Squinewave oscillator
+
+
+classmethods::
+
+method::ar, kr
+
+argument::TODO
+
+argument::TODO
+
+
+examples::
+
+code::
+
+{ Squine.ar(/* TODO */) }.play
+
+::
