@@ -1,10 +1,18 @@
 Squine : UGen {
-	*ar { |input, gain|
-		/* TODO */
-		^this.multiNew('audio', input, gain);
-	}
-	checkInputs {
-		/* TODO */
-		^this.checkValidInputs;
+    *ar { arg freq=440.0, clip=0.0, skew=0.0, sync=0.0, mul=1.0, add=0.0, iminsweep=0, initphase=1.25;
+        ^this.multiNew('audio', freq, clip, skew, sync, iminsweep, initphase).madd(mul, add)
 	}
 }
+
+/* Separate with sync output?
+SquineSync : MultiOutUGen {
+    *ar { arg freq=440.0, clip=0.0, skew=0.0, sync=0.0, mul=1.0, add=0.0, iminsweep=0.0, initphase=1.25;
+        ^this.multiNew('audio', freq, clip, skew, sync, iminsweep, initphase).madd(mul, add)
+	}
+
+	init { arg ... theInputs;
+		inputs = theInputs;
+		^this.initOutputs(2, rate);
+	}
+}
+*/
