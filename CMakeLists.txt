@@ -66,7 +66,6 @@ endif()
 
 set(Squine_cpp_files
     plugins/Squine/Squine.cpp
-    plugins/Squine/Squine.hpp
 )
 set(Squine_sc_files
     plugins/Squine/Squine.sc
