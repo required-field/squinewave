@@ -32,7 +32,7 @@ Squine::Squine() {
 
     if (in(7)) {
         // init_phase, freq, clip, skew
-        init_phase(in(7)[0], in(0)[0], in(1)[0], in(2)[0]);
+        init_phase(in0(7), in0(0), in0(1), in0(2));
     }
 
     mCalcFunc = make_calc_function<Squine, &Squine::next>();
@@ -128,8 +128,11 @@ void Squine::next(int nSamples) {
     int32_t sync = isAudioRateIn(3) ? find_sync(in(3), 0, nSamples) : -1;
     
     float* sound_out = out(0);
-    float* sync_out = out(1);
-    memset(sync_out, 0, nSamples * sizeof(float));
+    float* sync_out = nullptr;
+    if (numOutputs() > 1) {
+        sync_out = out(1);
+        memset(sync_out, 0, nSamples * sizeof(float));
+    }
 
     for (int32_t i = 0; i < nSamples; ++i) {
         double freq = fmax(freq_sig[i], 0.0);
@@ -266,7 +269,8 @@ void Squine::next(int nSamples) {
                     warped_phase = phase;
             }
 
-            sync_out[i] = 1.0;
+            if (sync_out)
+                sync_out[i] = 1.0;
         }
     }
 }
