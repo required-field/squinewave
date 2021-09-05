@@ -35,8 +35,7 @@ list::
 ::
 
 argument::sync
-Hardsync signal. When >= 1.0, resync waveform, by very fast sweep to phase 0.
-Sync signal is output 1 time per cycle.
+Hardsync signal. When >= 1.0, resync waveform by quickly raising emphasis::freq:: until waveform wraparound.
 
 argument::mul
 Output will be multiplied by this value.
@@ -46,7 +45,7 @@ This value will be added to the output.
 
 argument::iminsweep
 Minimum length in samples of square/pulse sine sweeps.
-Range: 4 to ar/100.
+Range: 4 to100.
 
 Default value 0 gets a random value range 5-15.
 This is useful because the spectrum of this waveform has quieter bands,

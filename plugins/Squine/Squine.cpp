@@ -80,18 +80,18 @@ Squine::Squine() {
 
     // Allow range 4-sr/100, randomize if below (eg zero or -1)
     Min_Sweep = in0(4);
-    if (Min_Sweep < 4.0 || Min_Sweep > sr * 0.01) {
+    if (Min_Sweep < 4 || Min_Sweep > 100) {
         // Random value range 5-15
-        if (Min_Sweep < 4.0)
+        if (Min_Sweep < 4)
             Min_Sweep = (int32_t)Clamp(10 * mParent->mRGen->drand() + 5, 5.0, 15);
         else
-            Min_Sweep = sr * 0.01;
+            Min_Sweep = 100;
         Print("Min_Sweep: %f\n", Min_Sweep);
     }
 
     Maxphase_By_sr = 2.0 / sr;
     Max_Warp_Freq = sr / (2.0 * Min_Sweep);          // range sr/8 - sr/400
-    Max_Sync_Freq = sr / (1.6667 * log(Min_Sweep));  // range sr/2.3 - sr/10
+    Max_Sync_Freq = sr / (1.6667 * log(Min_Sweep));  // range sr/2.3 - sr/7.6
     //Print("Max_Sync_Freq: sr/%f = %f\n", sr / Max_Sync_Freq, Max_Sync_Freq);
     Max_Warp = 1.0 / Min_Sweep;
 
