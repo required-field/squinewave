@@ -1,16 +1,16 @@
 CLASS:: Squine
-SUMMARY:: Sine-saw-square-pulse morphing oscillator
+SUMMARY:: Sine-saw-square-pulse morphing oscillator with hard sync
 CATEGORIES:: UGens>Generators>Deterministic
 
 DESCRIPTION::
 
-Bandlimited very clean oscillator  morphing between sine, saw-like, square and pulse waveforms.
+Bandlimited oscillator  morphing between sine, saw-like, square and pulse waveforms.
 
-Smooth shape (no ripples), so useful as LFO as well as audio source.
+Smooth waveform shape, so useful as LFO and FM modulator as well as audio source.
 The waveform morphing extends the palette of FM setups.
 
-The waveform has no sharp corners. The emphasis::iminsweep:: argument controls minimum length of pulse/square high/low flips.
-Due this minimum sweep length, the waveform "degrades" to sinewave at higher frequencies, so no aliasing of higher square/saw tones.
+The emphasis::iminsweep:: argument controls minimum length of pulse/square high/low flips.
+Due to this minimum sweep length, the waveform "degrades" to sinewave at higher frequencies, so no aliasing of higher square/saw tones.
 
 Hardsync is a very fast pulse-like sweep, but also bandlimited.
 
@@ -46,7 +46,7 @@ This value will be added to the output.
 
 argument::iminsweep
 Minimum length in samples of square/pulse sine sweeps.
-Range: 4 to 100.
+Range: 4 to ar/100.
 
 Default value 0 gets a random value range 5-15.
 This is useful because the spectrum of this waveform has quieter bands,
@@ -73,25 +73,35 @@ EXAMPLES::
 code::
 
 // Sinewave
-{ Squine.ar(220, 0, 0) }.play;
+{ Squine.ar(220, 0, 0, mul: 0.5) }.play;
 
 // Squarewave sweeping to pulse
-{ Squine.ar(220, 1, Line.kr(0, 1, 10)) }.scope;
+{ Squine.ar(220, clip: 1, skew: Line.kr(0, 1, 10), mul: 0.5) }.scope;
 
 // Morphing waveform
-{ Squine.ar(220, SinOsc.kr(0.2), SinOsc.kr(1.3, 0.5, 0.5)) }.scope;
+{ Squine.ar(220, clip: SinOsc.kr(0.2, 0, 0.5, 0.5), skew: SinOsc.kr(0.13), mul: 0.5) }.scope;
+
+// Audio-rate morphing waveform - no FM!
+{ Squine.ar(220, clip: SinOsc.kr(0.2, 0, 0.5, 0.5), skew: SinOsc.ar(130), mul: 0.5) }.scope;
 
 // Hardsync rising over 20 secs
-{ Squine.ar(100, SinOsc.kr(0.3, 0, 0.2, 0.5), 1, Impulse.ar(XLine.kr(5, 500, 20), 0.5, 2))}.scope;
+{ Squine.ar(100, clip: SinOsc.kr(0.3, 0, 0.2, 0.5), skew: 1, sync: Impulse.ar(XLine.kr(5, 500, 20), 0.5, 2), mul: 0.5) }.scope;
+
+// Compare Squine with SinOsc example 3 -- try different clip/skew values
+(
+{ [ SinOsc.ar(SinOsc.ar(XLine.kr(1, 1000, 9), 0, 200, 800), mul: 0.5),
+	Squine.ar(SinOsc.ar(XLine.kr(1, 1000, 9), 0, 200, 800), clip: 0.5, skew: 0.5, mul: 0.5) ]
+}.scope;
+)
 
 // FM patch
 (
-{ Pan2.ar(
-	Squine.ar(
-		Squine.ar(15, SinOsc.ar(0.3, 0, 0.5, 0.5),
-			Line.ar(-1, 1, 20), 0, 200, 300), 
-		SinOsc.ar(0.3, 0, 0.5, 0.5), SinOsc.ar(1.1), 0, 1, 0, 4),
-	0, 0.7) }.scope;
+  { Squine.ar(
+        freq: Squine.ar(100, clip: SinOsc.ar(0.3, 0, 0.5, 0.5), skew: Line.ar(-1, 1, 20), mul: 200, add: 300),
+        clip: SinOsc.ar(0.3, 0, 0.5, 0.5),
+        skew: SinOsc.ar(1.1), 
+        iminsweep: 4, mul: 0.5)  // Sharpest possible
+  }.scope;
 )
 
 ::

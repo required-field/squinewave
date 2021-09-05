@@ -1,4 +1,4 @@
-// PluginSquine.cpp
+// Squinewave oscillator for Supercollider
 // by rasmus ekman
 
 #include "SC_PlugIn.hpp"
@@ -41,6 +41,7 @@ private:
     double Min_Sweep;
     double Maxphase_By_sr;
     double Max_Warp_Freq;
+    double Max_Sync_Freq;
     double Max_Warp;
 };
 
@@ -51,6 +52,11 @@ static inline double Clamp(const double x, const double minval, const double max
     return (x >= minval && x <= maxval) ? x : (x < minval) ? minval : maxval;
 }
 
+// Inverted to get right up/down
+#define GET_CLIP(x) (1.0 - Clamp((x),  0.0, 1.0))
+// Rescaled to 0-2, to match phase
+#define GET_SKEW(x) (1.0 - Clamp((x), -1.0, 1.0))
+
 /* ================================================================== */
 
 Squine::Squine() {
@@ -58,8 +64,8 @@ Squine::Squine() {
 
     // Read here in case static value
     freq = non_sync_freq = in0(0);
-    clip = 1.0 - Clamp(in0(1), -1.0, 1.0);
-    skew = 1.0 - Clamp(in0(2), 0.0, 1.0);
+    clip = GET_CLIP(in0(1));
+    skew = GET_SKEW(in0(2));
 
     freq_ar = isAudioRateIn(0);
     clip_ar = isAudioRateIn(1);
@@ -72,25 +78,29 @@ Squine::Squine() {
     sync_ar = isAudioRateIn(3);
     hardsync_phase = hardsync_inc = 0;
 
+    // Allow range 4-sr/100, randomize if below (eg zero or -1)
     Min_Sweep = in0(4);
-    // Allow range 4-sr/100
     if (Min_Sweep < 4.0 || Min_Sweep > sr * 0.01) {
-        Min_Sweep = (int32_t)Clamp(10 * mParent->mRGen->drand() + 5, 5.0, 15);
-        //Min_Sweep = (int32_t)Clamp(sr / 3000.0, 5.0, sr * 0.01);
+        // Random value range 5-15
+        if (Min_Sweep < 4.0)
+            Min_Sweep = (int32_t)Clamp(10 * mParent->mRGen->drand() + 5, 5.0, 15);
+        else
+            Min_Sweep = sr * 0.01;
         Print("Min_Sweep: %f\n", Min_Sweep);
     }
 
     Maxphase_By_sr = 2.0 / sr;
     Max_Warp_Freq = sr / (2.0 * Min_Sweep);
+    Max_Sync_Freq = Clamp(Max_Warp_Freq * 2.0, sr / 20.0, sr / 3.0);
+    Print("Max_Sync_Freq: %f\n", Max_Sync_Freq);
     Max_Warp = 1.0 / Min_Sweep;
 
-    //Print("freq, %f, clip: %f, skew: %f, sync? %i, sweep: %f, phase: %f\n", freq, clip, skew, (int)sync_ar, in0(4), in0(5));
+    //Print("freq: %f, clip: %f, skew: %f, sync? %i, sweep: %f, phase: %f\n", freq, clip, skew, (int)sync_ar, in0(4), in0(5));
 
     double startphase = in0(5);
     if (startphase) {
         startphase = (startphase < 0) ? 1.25 : startphase;
         init_phase(startphase);
-        //Print("initphase: %f => phase: %f, warped: %f\n", startphase, phase, warped_phase);
     }
 
     mCalcFunc = make_calc_function<Squine, &Squine::next>();
@@ -165,7 +175,7 @@ void Squine::hardsync_init(const double freq, const double warped_phase)
         return;
     }
 
-    if (freq > this->Max_Warp_Freq)
+    if (freq > this->Max_Sync_Freq)
         return;
 
     this->hardsync_inc = (pi / this->Min_Sweep);
@@ -189,25 +199,34 @@ void Squine::next(int nSamples) {
     } */
 
     double freq_inc = freq_kr ? (in0(0) - freq) / nSamples : 0;
-    double clip_inc = clip_kr ? ( (1.0 - Clamp(in0(1),  0.0, 1.0)) - clip ) / nSamples : 0;
-    double skew_inc = skew_kr ? ( (1.0 - Clamp(in0(2), -1.0, 1.0)) - skew ) / nSamples : 0;
+    double clip_inc = clip_kr ? ( GET_CLIP(in0(1)) - clip ) / nSamples : 0;
+    double skew_inc = skew_kr ? ( GET_SKEW(in0(2)) - skew ) / nSamples : 0;
+
+    float diff = -1.0;
+    for (int32_t i = 0; i < nSamples; ++i) {
+        if (clip_sig[i] != -1.0)
+            diff = std::max(diff, clip_sig[i]);
+    }
 
     for (int32_t i = 0; i < nSamples; ++i) {
-        // KR values pre-inc'd monotonously here; AR values updated as needed below
-        if (freq_kr) {
+        // Annoying switch on update rate :(
+        if (freq_ar)
+            freq = non_sync_freq = fmax(freq_sig[i], 0.0);
+        else if (freq_kr) {
             freq += freq_inc;
             non_sync_freq = freq;
         }
-        else if (freq_ar)
-            freq = non_sync_freq = fmax(freq_sig[i], 0.0);
-        if (clip_kr)
-            clip = Clamp(clip + clip_inc, 0.0, 1.0);
-        if (skew_kr)
-            skew = Clamp(skew + skew_inc, -1.0, 1.0);
+        if (clip_ar)
+            clip = GET_CLIP(clip_sig[i]);
+        else if (clip_kr)
+            clip = Clamp(clip + clip_inc,  0.0, 1.0);  // NB NOT 1.0 - etc
+        if (skew_ar)
+            skew = GET_SKEW(skew_sig[i]);
+        else if (skew_kr)
+            skew = Clamp(skew + skew_inc, 0.0, 2.0);  // operating range 0-2
 
         // hardsync requested?
         if (i == sync) {
-            //Print("sync: %i ", sync);
             hardsync_init(freq, warped_phase);
         }
 
@@ -233,12 +252,6 @@ void Squine::next(int nSamples) {
         }
         else {
             const double min_sweep = phase_inc * Min_Sweep;
-            //const double clip = 1.0 - Clamp(clip_sig[i], 0.0, 1.0);
-            //const double skew = 1.0 - Clamp(skew_sig[i], -1.0, 1.0);
-            if (clip_ar)
-                clip = 1.0 - Clamp(clip_sig[i], 0.0, 1.0);
-            if (skew_ar)
-                skew = 1.0 - Clamp(skew_sig[i], -1.0, 1.0);
             const double midpoint = Clamp(skew, min_sweep, 2.0 - min_sweep);
 
             // 1st half: Sweep down to cos(warped_phase <= pi) then flat -1 until phase >= midpoint
@@ -319,7 +332,6 @@ void Squine::next(int nSamples) {
         if (warped_phase >= 2.0 && phase >= 2.0)
         {
             if (hardsync_phase) {
-                //Print("sync end: %i\n", i);
                 warped_phase = phase = 0.0;
                 hardsync_phase = hardsync_inc = 0.0;
                 freq = non_sync_freq;
@@ -334,12 +346,6 @@ void Squine::next(int nSamples) {
                 }
                 if (freq < Max_Warp_Freq) {
                     const double min_sweep = phase_inc * Min_Sweep;
-                    //const double clip = 1.0 - Clamp(clip_sig[i], 0.0, 1.0);
-                    //const double skew = 1.0 - Clamp(skew_sig[i], -1.0, 1.0);
-                    if (clip_ar)
-                        clip = 1.0 - Clamp(clip_sig[i], 0.0, 1.0);
-                    if (skew_ar)
-                        skew = 1.0 - Clamp(skew_sig[i], -1.0, 1.0);
                     const double midpoint = Clamp(skew, min_sweep, 2.0 - min_sweep);
                     const double next_sweep_length = fmax(clip * midpoint, min_sweep);
                     warped_phase = fmin(phase / next_sweep_length, Max_Warp);
