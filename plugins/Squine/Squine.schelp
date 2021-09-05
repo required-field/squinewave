@@ -85,7 +85,7 @@ code::
 { Squine.ar(220, clip: SinOsc.kr(0.2, 0, 0.5, 0.5), skew: SinOsc.ar(130), mul: 0.5) }.scope;
 
 // Hardsync rising over 20 secs
-{ Squine.ar(100, clip: SinOsc.kr(0.3, 0, 0.2, 0.5), skew: 1, sync: Impulse.ar(XLine.kr(5, 500, 20), 0.5, 2), mul: 0.5) }.scope;
+{ Squine.ar(100, clip: SinOsc.kr(0.3, 0, 0.2, 0.5), skew: 1, sync: Impulse.ar(XLine.kr(5, 500, 20)), mul: 0.5) }.scope;
 
 // Compare Squine with SinOsc example 3 -- try different clip/skew values
 (
