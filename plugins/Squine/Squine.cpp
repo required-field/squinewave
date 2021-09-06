@@ -92,7 +92,6 @@ Squine::Squine() {
     Maxphase_By_sr = 2.0 / sr;
     Max_Warp_Freq = sr / (2.0 * Min_Sweep);          // range sr/8 - sr/400
     Max_Sync_Freq = sr / (1.6667 * log(Min_Sweep));  // range sr/2.3 - sr/7.6
-    //Print("Max_Sync_Freq: sr/%f = %f\n", sr / Max_Sync_Freq, Max_Sync_Freq);
     Max_Warp = 1.0 / Min_Sweep;
 
     //Print("freq: %f, clip: %f, skew: %f, sync? %i, sweep: %f, phase: %f\n", freq, clip, skew, (int)sync_ar, in0(4), in0(5));
@@ -201,12 +200,6 @@ void Squine::next(int nSamples) {
     double freq_inc = freq_kr ? (in0(0) - freq) / nSamples : 0;
     double clip_inc = clip_kr ? ( GET_CLIP(in0(1)) - clip ) / nSamples : 0;
     double skew_inc = skew_kr ? ( GET_SKEW(in0(2)) - skew ) / nSamples : 0;
-
-    float diff = -1.0;
-    for (int32_t i = 0; i < nSamples; ++i) {
-        if (clip_sig[i] != -1.0)
-            diff = std::max(diff, clip_sig[i]);
-    }
 
     for (int32_t i = 0; i < nSamples; ++i) {
         // Annoying switch on update rate :(

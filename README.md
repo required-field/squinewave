@@ -27,6 +27,11 @@ Then, use CMake to configure and build it:
 You may want to manually specify the install location in the first step to point it at your
 SuperCollider extensions directory: add the option `-DCMAKE_INSTALL_PREFIX=/path/to/extensions`.
 
+(NB on mac this is usually named bla bla "/Application Support" blah with a space.
+This must be escaped, eg:
+    cmake .. -DCMAKE_INSTALL_PREFIX=~/Library/Application\ Support/SuperCollider/Extensions
+NOTE the tilde, it is omitted by SC Platform.userExtensionDir; command)
+
 It's expected that the SuperCollider repo is cloned at `../supercollider` relative to this repo. If
 it's not: add the option `-DSC_PATH=/path/to/sc/source`.
 
