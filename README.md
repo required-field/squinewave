@@ -29,7 +29,9 @@ SuperCollider extensions directory: add the option `-DCMAKE_INSTALL_PREFIX=/path
 
 (NB on mac this is usually named bla bla "/Application Support" blah with a space.
 This must be escaped, eg:
+
     cmake .. -DCMAKE_INSTALL_PREFIX=~/Library/Application\ Support/SuperCollider/Extensions
+
 NOTE the tilde, it is omitted by SC Platform.userExtensionDir; command)
 
 It's expected that the SuperCollider repo is cloned at `../supercollider` relative to this repo. If
