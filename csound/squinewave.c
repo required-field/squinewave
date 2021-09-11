@@ -24,6 +24,7 @@ typedef struct {
     double Min_Sweep;
     double Maxphase_By_sr;
     double Max_Warp_Freq;
+    double Max_Sync_Freq;
 
     MYFLT *sync_sig;        // holds async_in if a-rate
     int32_t init_phase;
@@ -59,7 +60,7 @@ static void hardsync_init(SQUINEWAVE *p, const double freq,
         return;
     }
 
-    if (freq > p->Max_Warp_Freq)
+    if (freq > p->Max_Sync_Freq)
         return;
 
     p->hardsync_inc = (PI / p->Min_Sweep);
@@ -97,7 +98,8 @@ int32_t squinewave_init(CSOUND* csound, SQUINEWAVE *p)
     }
 
     p->Maxphase_By_sr = 2.0 / sr;
-    p->Max_Warp_Freq = sr / (2.0 * p->Min_Sweep);
+    p->Max_Warp_Freq = sr / (2.0 * p->Min_Sweep);          // range sr/8 - sr/200
+    p->Max_Sync_Freq = sr / (1.6667 * log(p->Min_Sweep));  // range sr/2.3 - sr/7.6
 
     p->sync_sig = IS_ASIG_ARG(p->async_in) ? p->async_in : 0;
 
@@ -121,10 +123,11 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
       memset(&p->aout[ksmps_end], 0, p->h.insdshead->ksmps_no_end * sizeof(MYFLT));
     }
 
+    const double Min_Sweep = p->Min_Sweep;
     const double Maxphase_By_sr = p->Maxphase_By_sr;
     const double Max_Warp_Freq = p->Max_Warp_Freq;
+    const double Max_Sync_Freq = p->Max_Sync_Freq;
     const double Max_Warp = 1.0 / p->Min_Sweep;
-    const double Min_Sweep = p->Min_Sweep;
 
     MYFLT *aout = &p->aout[0];
     const MYFLT * const freq_sig = p->acps;
@@ -207,7 +210,7 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
 
       if (hardsync_phase) {
         const double syncsweep = 0.5 * (1.0 - cos(hardsync_phase));
-        freq += syncsweep * ((2.0 * Max_Warp_Freq) - freq);
+        freq += syncsweep * (Max_Sync_Freq - freq);
         hardsync_phase += hardsync_inc;
         if (hardsync_phase > PI) {
           hardsync_phase = PI;
