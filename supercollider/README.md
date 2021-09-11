@@ -2,7 +2,7 @@
 
 Author: rasmus
 
-Squinewave oscillator
+Squinewave oscillator as supercollider extension Ugen
 
 ### Requirements
 
