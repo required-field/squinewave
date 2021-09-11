@@ -22,17 +22,21 @@ The waveform is shaped by 2 params: *clip* and *skew*:
 #### Hardsync
 When a trigger is received, frequency is raised very quickly until next cycle.  
 This creates a short sine pulse (0-20 samples), depending on current waveform phase.  
+
 Optionally emit a hardsync trigger each cycle.  
-This can be chained to next Squinewave, for hardsync bursts.
+(Tip: Chain sync output to next Squinewave, for hardsync bursts, since sync output is emitted after its own sync sweep).
 
 
 #### Bandlimited - not by filtering
-This is ensured by init config parameter *MinSweep*, a minimal sample length of rise/fall shapes.  
-Recommended range 5-15. Legal range 4 - 100.
+This is ensured by init config parameter *MinSweep*, a minimal sample count of rise/fall shapes.  
+Recommended range 5-15 samps (randomized per unit). Legal range 4 - 100.
 
 Eg, a squarewave or the front of a saw starts with a very short cosine sweep, 5-10 samples.
-* On higher frequency the MinSweep is held, so all waveforms "degrade" to sinewave.
+* On higher frequency the MinSweep is held, so all waveforms "degrade" to sinewave.  
   Hence no aliasing on higher freq square or pulse waveform.
+
+The cost of generating a sample is 1 cos() call and some if-then switching.  
+But generally you can skip one low-pass filter in your synth patch, since reducing *clip* dampens the spectrum.
 
 
 #### Guarantee
@@ -45,4 +49,3 @@ Unlike BLEP techniques this has no ripples. The waveform is clean and stable, wo
 In all modesty this could replace most sine and square oscillators in every softsynth ever.
 
 There is no license in this repo.  
-The code in other repos is covered by the various licenses of those systems.
