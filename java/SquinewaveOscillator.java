@@ -44,7 +44,7 @@ public class SquinewaveOscillator
 		Min_Sweep = Clamp(min_sweep_in, 4, 100);
 		Max_Warp = 1.0 / Min_Sweep;
 		Maxphase_By_sr = 2.0 / sample_rate;
-		Max_Warp_Freq = sample_rate / (2.0 * Min_Sweep);    // Range sr/8 - sr/100
+		Max_Warp_Freq = sample_rate / (2.0 * Min_Sweep);               // Range sr/8 - sr/200
 		Max_Sync_Freq = sample_rate / (1.6667 * Math.log(Min_Sweep));  // Range sr/2.3 - sr/7.6
 
 		// Defaults
@@ -71,7 +71,7 @@ public class SquinewaveOscillator
 	//  Inputs, called before generate()
 	//-------------------------------------------------------------------------------
 
-    // EITHER use this, OR the 4 individual setters
+	// EITHER use this, OR the 4 individual setters
 	public void update(double frq, double clp, double skw, double syn) {
 		setFreq(frq);
 		setClip(clp);
@@ -81,12 +81,12 @@ public class SquinewaveOscillator
 	
 	public void setFreq(double x) { freq = Clamp(x, 1.0 / 60.0, Max_Freq); }
 	public void setSkew(double x) {
-	    // Map to 0-2, leftfacing when -1
-	    skew = 1 - Clamp(x, -1, 1);
+		// Map to 0-2, leftfacing when -1
+		skew = 1 - Clamp(x, -1, 1);
 	}
 	public void setClip(double x) {
-	    // inverted to proportion of segment
-	    clip = 1 - Clamp(x, 0, 1);
+		// inverted to proportion of segment
+		clip = 1 - Clamp(x, 0, 1);
 	}
 	public void setSync(double x) { sync_in = (x >= Sync_Trig); }
 
@@ -211,7 +211,7 @@ public class SquinewaveOscillator
 
 		phase += phase_inc;
 
-	    // phase wraparound?
+		// phase wraparound?
 		if (warped_phase >= 2.0 && phase >= 2.0)
 		{
 			if (hardsync_phase != 0) {
@@ -270,7 +270,7 @@ public class SquinewaveOscillator
 	// Set full state so waveform starts at specific phase.
 	// Phase range 0-2; the symbolic range covers 
 	//   (0.0-0.5) first sweep down (zero-crossing at 0.25)
-	//   (0.5-1.1) flat low part -1
+	//   (0.5-1.0) flat low part -1
 	//   (1.0-1.5) 2nd sweep up (zero-crossing at 1.25)
 	//   (1.5-2.0) flat high part +1
 	// This is useful for LFO:s; eg for a sweep that starts per note (output amp 0 at the time, or you get a harsh click).
