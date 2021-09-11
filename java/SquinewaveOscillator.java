@@ -45,7 +45,7 @@ public class SquinewaveOscillator
 		Max_Warp = 1.0 / Min_Sweep;
 		Maxphase_By_sr = 2.0 / sample_rate;
 		Max_Warp_Freq = sample_rate / (2.0 * Min_Sweep);    // Range sr/8 - sr/100
-        Max_Sync_Freq = sample_rate / (1.6667 * Math.log(Min_Sweep));  // Range sr/2.3 - sr/7.6
+		Max_Sync_Freq = sample_rate / (1.6667 * Math.log(Min_Sweep));  // Range sr/2.3 - sr/7.6
 
 		// Defaults
 		freq = 220;
