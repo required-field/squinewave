@@ -90,7 +90,7 @@ Squine::Squine() {
     }
 
     Maxphase_By_sr = 2.0 / sr;
-    Max_Warp_Freq = sr / (2.0 * Min_Sweep);          // range sr/8 - sr/400
+    Max_Warp_Freq = sr / (2.0 * Min_Sweep);          // range sr/8 - sr/200
     Max_Sync_Freq = sr / (1.6667 * log(Min_Sweep));  // range sr/2.3 - sr/7.6
     Max_Warp = 1.0 / Min_Sweep;
 
@@ -227,7 +227,6 @@ void Squine::next(int nSamples) {
         if (hardsync_phase) {
             const double syncsweep = 0.5 * (1.0 - cos(hardsync_phase));
             freq += syncsweep * (Max_Sync_Freq - freq);
-            //freq += syncsweep * ((2.0 * Max_Warp_Freq) - freq);
             hardsync_phase += hardsync_inc;
             if (hardsync_phase > pi) {
                 hardsync_phase = pi;
