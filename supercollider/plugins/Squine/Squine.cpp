@@ -14,22 +14,87 @@ public:
     Squine();
 
 private:
+    /* Allow either static value, or buffer-rate or audio-rate signal.
+     * Buffer-rate values are ramped. (TODO: also smoothing?)
+     */
+    class input_param
+    {
+        const float*  host_sig = nullptr;
+        double        target = 0;
+        double        value = 0;
+        double        change = 0;
+    public:
+        // Or include whatever needed for std::min
+        inline int min_val(int x, int y) { return x < y ? x : y; }
+
+         // Called at startup to declare host signal
+        void init(const float* host_sig_in, bool is_audiorate)
+        {
+            if (is_audiorate) {
+                host_sig = host_sig_in;
+            }
+            else {
+                host_sig = nullptr;
+                value = host_sig_in[0];
+            }
+        }
+
+       // Called each process block to refresh host signal
+        void reinit(const float* host_sig_in, int sample_count)
+        {
+            if (host_sig) {
+                host_sig = host_sig_in;
+            }
+            else {
+                set_target(host_sig_in[0], 1. / sample_count);
+            }
+        }
+
+        void check_finished() {
+            if (change && fabs(value - target) <= fabs(change)) {
+                value = target;
+                change = 0;
+            }
+        }
+
+        void set_target(double val, double changerate) {
+            target = val;
+            change = (target - value) * changerate;
+            check_finished();
+        }
+
+        double get_next(int n) {
+            if (host_sig) {
+                value = host_sig[n];
+                return value;
+            }
+            value += change;
+            check_finished();
+            return value;
+        }
+
+        double get_current() const {
+            return value;
+        }
+    };
+
+
+private:
     // Calc function
     void next(int nSamples);
 
-    void init_phase(const double phase_in);
+    void init_phase(const double phase_in, const double freq, const double clip, const double skew);
     void hardsync_init(const double freq, const double warped_phase);
 
-    // Member variables
-    double freq;
-    double clip;
-    double skew;
-
-    // Supercollider specials
-    double non_sync_freq;  // Used iff kr freq and hardsync
-    // Store audiorate state locally to save on pointer dereferences
-    bool freq_ar, clip_ar, skew_ar, sync_ar;
-    bool freq_kr, clip_kr, skew_kr;
+    // Input variables
+    input_param freq_param;
+    input_param clip_param;
+    input_param skew_param;
+    // Refresh input each perform buffer?
+    bool freq_update;
+    bool clip_update;
+    bool skew_update;
+    bool sync_ar;
 
     // phase and warped_phase range 0-2. This makes skew/clip into simple proportions
     double phase;
@@ -52,7 +117,9 @@ static inline double Clamp(const double x, const double minval, const double max
     return (x >= minval && x <= maxval) ? x : (x < minval) ? minval : maxval;
 }
 
-// Inverted to get right up/down
+// No negative freq (and not mirrored either...)
+#define GET_FREQ(x) fmax(x, 0.0)
+// Inverted to get proportion flat parts
 #define GET_CLIP(x) (1.0 - Clamp((x),  0.0, 1.0))
 // Rescaled to 0-2, to match phase
 #define GET_SKEW(x) (1.0 - Clamp((x), -1.0, 1.0))
@@ -62,18 +129,15 @@ static inline double Clamp(const double x, const double minval, const double max
 Squine::Squine() {
     const double sr = sampleRate();
 
-    // Read here in case static value
-    freq = non_sync_freq = in0(0);
-    clip = GET_CLIP(in0(1));
-    skew = GET_SKEW(in0(2));
+    // Get in param rates
+    freq_param.init(in(0), isAudioRateIn(0));
+    clip_param.init(in(1), isAudioRateIn(1));
+    skew_param.init(in(2), isAudioRateIn(2));
 
-    freq_ar = isAudioRateIn(0);
-    clip_ar = isAudioRateIn(1);
-    skew_ar = isAudioRateIn(2);
-    freq_kr = isControlRateIn(0);
-    clip_kr = isControlRateIn(1);
-    skew_kr = isControlRateIn(2);
-    //Print("AR: %i, %i, %i; KR: %i, %i, %i\n", (int)freq_ar, (int)clip_ar, (int)skew_ar, (int)freq_kr, (int)clip_kr, (int)skew_kr);
+    freq_update = isAudioRateIn(0) || isControlRateIn(0);
+    clip_update = isAudioRateIn(1) || isControlRateIn(1);
+    skew_update = isAudioRateIn(2) || isControlRateIn(2);
+    //Print("Update: %i, %i, %i\n", (int)freq_update, (int)clip_update, (int)skew_update);
 
     sync_ar = isAudioRateIn(3);
     hardsync_phase = hardsync_inc = 0;
@@ -94,13 +158,16 @@ Squine::Squine() {
     Max_Sync_Freq = sr / (1.6667 * log(Min_Sweep));  // range sr/2.3 - sr/7.6
     Max_Warp = 1.0 / Min_Sweep;
 
-    //Print("freq: %f, clip: %f, skew: %f, sync? %i, sweep: %f, phase: %f\n", freq, clip, skew, (int)sync_ar, in0(4), in0(5));
-
+    // Init phase range 0-2 (which is wraparaound)
     double startphase = in0(5);
     if (startphase) {
-        startphase = (startphase < 0) ? 1.25 : startphase;
-        init_phase(startphase);
+        startphase = (startphase < 0 || startphase > 2.0) ? 1.25 : startphase;
+        double freq = GET_FREQ(in0(0));
+        double clip = GET_CLIP(in0(1));
+        double skew = GET_SKEW(in0(2));
+        init_phase(startphase, freq, clip, skew);
     }
+
 
     mCalcFunc = make_calc_function<Squine, &Squine::next>();
     next(1);
@@ -109,7 +176,7 @@ Squine::Squine() {
 /* ================================================================== */
 
 // Set main phase so it matches warp
-void Squine::init_phase(const double phase_in) {
+void Squine::init_phase(const double phase_in, const double freq, const double clip, const double skew) {
     const double phase_inc = Maxphase_By_sr * freq;
     const double min_sweep = phase_inc * Min_Sweep;
     const double midpoint = Clamp(skew, min_sweep, 2.0 - min_sweep);
@@ -184,9 +251,13 @@ void Squine::hardsync_init(const double freq, const double warped_phase)
 /* ================================================================== */
 
 void Squine::next(int nSamples) {
-    const float* const freq_sig = freq_ar ? in(0) : nullptr;
-    const float* const clip_sig = clip_ar ? in(1) : nullptr;
-    const float* const skew_sig = skew_ar ? in(2) : nullptr;
+    // Get next input buffer (or kr value)
+    if (freq_update)
+        freq_param.reinit(in(0), nSamples);
+    if (clip_update)
+        clip_param.reinit(in(1), nSamples);
+    if (skew_update)
+        skew_param.reinit(in(2), nSamples);
 
     // Look for sync if a-rate
     int32_t sync = sync_ar ? find_sync(in(3), 0, nSamples) : -1;
@@ -197,26 +268,11 @@ void Squine::next(int nSamples) {
         memset(sync_out, 0, nSamples * sizeof(float));
     } */
 
-    double freq_inc = freq_kr ? (in0(0) - freq) / nSamples : 0;
-    double clip_inc = clip_kr ? ( GET_CLIP(in0(1)) - clip ) / nSamples : 0;
-    double skew_inc = skew_kr ? ( GET_SKEW(in0(2)) - skew ) / nSamples : 0;
-
     for (int32_t i = 0; i < nSamples; ++i) {
         // Annoying switch on update rate :(
-        if (freq_ar)
-            freq = non_sync_freq = fmax(freq_sig[i], 0.0);
-        else if (freq_kr) {
-            freq += freq_inc;
-            non_sync_freq = freq;
-        }
-        if (clip_ar)
-            clip = GET_CLIP(clip_sig[i]);
-        else if (clip_kr)
-            clip = Clamp(clip + clip_inc,  0.0, 1.0);  // NB NOT 1.0 - etc
-        if (skew_ar)
-            skew = GET_SKEW(skew_sig[i]);
-        else if (skew_kr)
-            skew = Clamp(skew + skew_inc, 0.0, 2.0);  // operating range 0-2
+        double freq = GET_FREQ(freq_param.get_next(i));
+        double clip = GET_CLIP(clip_param.get_next(i));
+        double skew = GET_SKEW(skew_param.get_next(i));
 
         // hardsync requested?
         if (i == sync) {
@@ -327,7 +383,6 @@ void Squine::next(int nSamples) {
             if (hardsync_phase) {
                 warped_phase = phase = 0.0;
                 hardsync_phase = hardsync_inc = 0.0;
-                freq = non_sync_freq;
 
                 sync = find_sync(in(3), i, nSamples);
             }
