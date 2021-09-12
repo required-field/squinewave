@@ -13,11 +13,10 @@ Each implementation is basically the same, but in slightly different environment
 Just cosine sweeps and flat parts.  
 The waveform is shaped by 2 params: *clip* and *skew*:
 
-* **Clip** is implemented by flat segments at the top/bottom. Range: 0.0 - 1.0
-* **Skew** shifts the wave right-left to deform the shape.  Range: -1 to +1.
-  *  (clip = 0) sine becomes saw-like, and
-  *  (clip = 1) square goes to pulse waveform
-
+* **Clip** "squareness" of waveform shape. Range: 0.0 - 1.0.
+  * Clip 0 is sinewave (or saw), clip 1 is squarewave (or pulse).
+* **Skew** symmetry of waveform shape.  Range: -1 to +1.
+  * Skew = 0 is symmetric like sine or square. Skew +1 or -1 is right/left-facing saw or pulse.
 
 #### Hardsync
 When a trigger is received, frequency is raised very quickly until next cycle.  
