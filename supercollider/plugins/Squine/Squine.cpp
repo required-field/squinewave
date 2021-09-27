@@ -90,10 +90,6 @@ private:
     input_param freq_param;
     input_param clip_param;
     input_param skew_param;
-    // Refresh input each perform buffer?
-    bool freq_update;
-    bool clip_update;
-    bool skew_update;
     bool sync_ar;
 
     // phase and warped_phase range 0-2. This makes skew/clip into simple proportions
@@ -134,11 +130,6 @@ Squine::Squine() {
     clip_param.init(in(1), isAudioRateIn(1));
     skew_param.init(in(2), isAudioRateIn(2));
 
-    freq_update = isAudioRateIn(0) || isControlRateIn(0);
-    clip_update = isAudioRateIn(1) || isControlRateIn(1);
-    skew_update = isAudioRateIn(2) || isControlRateIn(2);
-    //Print("Update: %i, %i, %i\n", (int)freq_update, (int)clip_update, (int)skew_update);
-
     sync_ar = isAudioRateIn(3);
     hardsync_phase = hardsync_inc = 0;
 
@@ -147,10 +138,10 @@ Squine::Squine() {
     if (Min_Sweep < 4 || Min_Sweep > 100) {
         // Random value range 5-15
         if (Min_Sweep < 4)
-            Min_Sweep = (int32_t)Clamp(10 * mParent->mRGen->drand() + 5, 5.0, 15);
+            Min_Sweep = Clamp(10 * mParent->mRGen->drand() + 5, 5.0, 15);
         else
             Min_Sweep = 100;
-        Print("Min_Sweep: %f\n", Min_Sweep);
+        //Print("Min_Sweep: %f\n", Min_Sweep);
     }
 
     Maxphase_By_sr = 2.0 / sr;
@@ -252,12 +243,9 @@ void Squine::hardsync_init(const double freq, const double warped_phase)
 
 void Squine::next(int nSamples) {
     // Get next input buffer (or kr value)
-    if (freq_update)
-        freq_param.reinit(in(0), nSamples);
-    if (clip_update)
-        clip_param.reinit(in(1), nSamples);
-    if (skew_update)
-        skew_param.reinit(in(2), nSamples);
+    freq_param.reinit(in(0), nSamples);
+    clip_param.reinit(in(1), nSamples);
+    skew_param.reinit(in(2), nSamples);
 
     // Look for sync if a-rate
     int32_t sync = sync_ar ? find_sync(in(3), 0, nSamples) : -1;
