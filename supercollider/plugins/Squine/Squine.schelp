@@ -103,4 +103,21 @@ code::
   }.scope;
 )
 
+// This is almost entirely unlike
+// Synapscape face me: https://www.youtube.com/watch?v=pBGVbyuRdiY
+// or
+// LPC Dream Machine: https://www.youtube.com/watch?v=7n5mO2dshIg
+({
+	var factor = Squine.ar(1 / 30, clip: 0.4, skew: 0.5, mul: 5, add: 10);
+	[ Squine.ar(50 - factor + Squine.ar(2.5, skew: 1, mul: factor, add: factor),
+		clip: MouseX.kr(),
+		skew: MouseY.kr(-1),
+		mul: 0.5),
+	  Squine.ar(51 - factor + Squine.ar(2.5, skew: 1, mul: factor, add: factor),
+		clip: MouseX.kr(),
+		skew: MouseY.kr(1, -1),
+		 mul: 0.5)
+	]
+}.scope; )
+
 ::
