@@ -84,7 +84,7 @@ private:
     void next(int nSamples);
 
     void init_phase(const double phase_in, const double freq, const double clip, const double skew);
-    void hardsync_init(const double freq, const double warped_phase);
+    void hardsync_init(const double freq, const double sweep_phase);
 
     // Input variables
     input_param freq_param;
@@ -92,18 +92,19 @@ private:
     input_param skew_param;
     bool sync_ar;
 
-    // phase and warped_phase range 0-2. This makes skew/clip into simple proportions
+    // phase and sweep_phase range 0-2. This makes skew/clip into simple proportions
     double phase;
-    double warped_phase;
+    double sweep_phase;
     double hardsync_phase;
     double hardsync_inc;
 
     // Instance constants inited from environment
     double Min_Sweep;
     double Maxphase_By_sr;
-    double Max_Warp_Freq;
+    double Max_Sweep_Freq;
+    double Max_Sweep_Phase;
     double Max_Sync_Freq;
-    double Max_Warp;
+    double Sync_Phase_Inc;
 };
 
 /* ================================================================== */
@@ -145,9 +146,10 @@ Squine::Squine() {
     }
 
     Maxphase_By_sr = 2.0 / sr;
-    Max_Warp_Freq = sr / (2.0 * Min_Sweep);          // range sr/8 - sr/200
-    Max_Sync_Freq = sr / (1.6667 * log(Min_Sweep));  // range sr/2.3 - sr/7.6
-    Max_Warp = 1.0 / Min_Sweep;
+    Max_Sweep_Freq = sr / (2.0 * Min_Sweep);      // range sr/8 - sr/200
+    Max_Sweep_Phase = 1.0 / Min_Sweep;
+    Max_Sync_Freq = sr / (3.0 * log(Min_Sweep));  // range sr/4.1 - sr/13.8
+    Sync_Phase_Inc = 1.0 / log(Min_Sweep);
 
     // Init phase range 0-2 (which is wraparaound)
     double startphase = in0(5);
@@ -166,44 +168,44 @@ Squine::Squine() {
 
 /* ================================================================== */
 
-// Set main phase so it matches warp
+// Set main phase so it matches sweep_phase
 void Squine::init_phase(const double phase_in, const double freq, const double clip, const double skew) {
     const double phase_inc = Maxphase_By_sr * freq;
     const double min_sweep = phase_inc * Min_Sweep;
     const double midpoint = Clamp(skew, min_sweep, 2.0 - min_sweep);
 
     // Init phase range 0-2, has 4 segment parts (sweep down, flat -1, sweep up, flat +1)
-    warped_phase = phase_in;
-    if (warped_phase < 0.0) {
+    sweep_phase = phase_in;
+    if (sweep_phase < 0.0) {
         // "up" 0-crossing
-        warped_phase = 1.25;
+        sweep_phase = 1.25;
     }
-    if (warped_phase > 2.0)
-        warped_phase = fmod(warped_phase, 2.0);
+    if (sweep_phase > 2.0)
+        sweep_phase = fmod(sweep_phase, 2.0);
 
     // Select segment and scale within
-    if (warped_phase < 1.0) {
+    if (sweep_phase < 1.0) {
         const double sweep_length = fmax(clip * midpoint, min_sweep);
-        if (warped_phase < 0.5) {
-            phase = sweep_length * (warped_phase * 2.0);
-            warped_phase *= 2.0;
+        if (sweep_phase < 0.5) {
+            phase = sweep_length * (sweep_phase * 2.0);
+            sweep_phase *= 2.0;
         }
         else {
             const double flat_length = midpoint - sweep_length;
-            phase = sweep_length + flat_length * ((warped_phase - 0.5) * 2.0);
-            warped_phase = 1.0;
+            phase = sweep_length + flat_length * ((sweep_phase - 0.5) * 2.0);
+            sweep_phase = 1.0;
         }
     }
     else {
         const double sweep_length = fmax(clip * (2.0 - midpoint), min_sweep);
-        if (warped_phase < 1.5) {
-            phase = midpoint + sweep_length * ((warped_phase - 1.0) * 2.0);
-            warped_phase = 1.0 + (warped_phase - 1.0) * 2.0;
+        if (sweep_phase < 1.5) {
+            phase = midpoint + sweep_length * ((sweep_phase - 1.0) * 2.0);
+            sweep_phase = 1.0 + (sweep_phase - 1.0) * 2.0;
         }
         else {
             const double flat_length = 2.0 - (midpoint + sweep_length);
-            phase = midpoint + sweep_length + flat_length * ((warped_phase - 1.5) * 2.0);
-            warped_phase = 2.0;
+            phase = midpoint + sweep_length + flat_length * ((sweep_phase - 1.5) * 2.0);
+            sweep_phase = 2.0;
         }
     }
 }
@@ -221,13 +223,15 @@ static inline int32_t find_sync(const float* sync_sig, const int32_t first, cons
 
 /* ================================================================== */
 
-void Squine::hardsync_init(const double freq, const double warped_phase)
+void Squine::hardsync_init(const double freq, const double sweep_phase)
 {
+    // Ignore sync request if already in hardsync
     if (this->hardsync_phase)
         return;
 
-    // If we're in last flat part, we're just done now
-    if (warped_phase == 2.0) {
+    // If waveform is on last flat part, we're just done now
+    // (could also start a full spike here, it's an option...)
+    if (sweep_phase == 2.0) {
         this->phase = 2.0;
         return;
     }
@@ -235,7 +239,7 @@ void Squine::hardsync_init(const double freq, const double warped_phase)
     if (freq > this->Max_Sync_Freq)
         return;
 
-    this->hardsync_inc = (pi / this->Min_Sweep);
+    this->hardsync_inc = this->Sync_Phase_Inc;
     this->hardsync_phase = this->hardsync_inc * 0.5;
 }
 
@@ -264,7 +268,7 @@ void Squine::next(int nSamples) {
 
         // hardsync requested?
         if (i == sync) {
-            hardsync_init(freq, warped_phase);
+            hardsync_init(freq, sweep_phase);
         }
 
         // hardsync ongoing? Increase freq until wraparound
@@ -281,84 +285,84 @@ void Squine::next(int nSamples) {
         const double phase_inc = Maxphase_By_sr * freq;
 
         // Pure sine if freq > sr / (2 * Min_Sweep)
-        if (freq >= Max_Warp_Freq) {
-            // Continue from warped
-            sound_out[i] = static_cast<float>( cos(pi * warped_phase) );
-            phase = warped_phase;
-            warped_phase += phase_inc;
+        if (freq >= Max_Sweep_Freq) {
+            // Continue from sweep_phase
+            sound_out[i] = static_cast<float>( cos(pi * sweep_phase) );
+            phase = sweep_phase;
+            sweep_phase += phase_inc;
         }
         else {
             const double min_sweep = phase_inc * Min_Sweep;
             const double midpoint = Clamp(skew, min_sweep, 2.0 - min_sweep);
 
-            // 1st half: Sweep down to cos(warped_phase <= pi) then flat -1 until phase >= midpoint
-            if (warped_phase < 1.0 || (warped_phase == 1.0 && phase < midpoint))
+            // 1st half: Sweep down to cos(sweep_phase <= pi) then flat -1 until phase >= midpoint
+            if (sweep_phase < 1.0 || (sweep_phase == 1.0 && phase < midpoint))
             {
-                if (warped_phase < 1.0) {
+                if (sweep_phase < 1.0) {
                     const double sweep_length = fmax(clip * midpoint, min_sweep);
 
-                    sound_out[i] = static_cast<float>( cos(pi * warped_phase) );
-                    warped_phase += fmin(phase_inc / sweep_length, Max_Warp);
+                    sound_out[i] = static_cast<float>( cos(pi * sweep_phase) );
+                    sweep_phase += fmin(phase_inc / sweep_length, Max_Sweep_Phase);
 
-                    // Handle fractional warped_phase overshoot after sweep ends
-                    if (warped_phase > 1.0) {
-                        /* Tricky here: phase and warped may disagree where we are in waveform (due to FM + skew/clip changes).
-                         * Warped dominates to keep waveform stable, waveform (flat part) decides where we are.
+                    // Handle fractional sweep_phase overshoot after sweep ends
+                    if (sweep_phase > 1.0) {
+                        /* Tricky here: phase and sweep_phase may disagree where we are in waveform (due to FM + skew/clip changes).
+                         * Sweep_phase dominates to keep waveform stable, waveform (flat part) decides where we are.
                          */
                         const double flat_length = midpoint - sweep_length;
-                        // warp overshoot scaled to main phase rate
-                        const double phase_overshoot = (warped_phase - 1.0) * sweep_length;
+                        // sweep_phase overshoot scaled to main phase rate
+                        const double phase_overshoot = (sweep_phase - 1.0) * sweep_length;
 
                         // phase matches shape
                         phase = midpoint - flat_length + phase_overshoot - phase_inc;
 
                         // Flat if next samp still not at midpoint
                         if (flat_length >= phase_overshoot) {
-                            warped_phase = 1.0;
+                            sweep_phase = 1.0;
                             // phase may be > midpoint here (which means actually no flat part),
-                            // if so it will be corrected in 2nd half (since warped == 1.0)
+                            // if so it will be corrected in 2nd half (since sweep_phase == 1.0)
                         }
                         else {
                             const double next_sweep_length = fmax(clip * (2.0 - midpoint), min_sweep);
-                            warped_phase = 1.0 + (phase_overshoot - flat_length) / next_sweep_length;
+                            sweep_phase = 1.0 + (phase_overshoot - flat_length) / next_sweep_length;
                         }
                     }
                 }
                 else {
                     // flat up to midpoint
                     sound_out[i] = -1.0;
-                    warped_phase = 1.0;
+                    sweep_phase = 1.0;
                 }
             }
-            // 2nd half: Sweep up to cos(warped_phase <= 2.pi) then flat +1 until phase >= 2
+            // 2nd half: Sweep up to cos(sweep_phase <= 2.pi) then flat +1 until phase >= 2
             else {
-                if (warped_phase < 2.0) {
+                if (sweep_phase < 2.0) {
                     const double sweep_length = fmax(clip * (2.0 - midpoint), min_sweep);
-                    if (warped_phase == 1.0) {
-                        // warped_phase overshoot after flat part
-                        warped_phase = 1.0 + fmin( fmin(phase - midpoint, phase_inc) / sweep_length, Max_Warp);
+                    if (sweep_phase == 1.0) {
+                        // sweep_phase overshoot after flat part
+                        sweep_phase = 1.0 + fmin( fmin(phase - midpoint, phase_inc) / sweep_length, Max_Sweep_Phase);
                     }
-                    sound_out[i] = static_cast<float>( cos(pi * warped_phase) );
-                    warped_phase += fmin(phase_inc / sweep_length, Max_Warp);
+                    sound_out[i] = static_cast<float>( cos(pi * sweep_phase) );
+                    sweep_phase += fmin(phase_inc / sweep_length, Max_Sweep_Phase);
 
-                    if (warped_phase > 2.0) {
+                    if (sweep_phase > 2.0) {
                         const double flat_length = 2.0 - (midpoint + sweep_length);
-                        const double phase_overshoot = (warped_phase - 2.0) * sweep_length;
+                        const double phase_overshoot = (sweep_phase - 2.0) * sweep_length;
 
                         phase = 2.0 - flat_length + phase_overshoot - phase_inc;
 
                         if (flat_length >= phase_overshoot) {
-                            warped_phase = 2.0;
+                            sweep_phase = 2.0;
                         }
                         else {
                             const double next_sweep_length = fmax(clip * midpoint, min_sweep);
-                            warped_phase = 2.0 + (phase_overshoot - flat_length) / next_sweep_length;
+                            sweep_phase = 2.0 + (phase_overshoot - flat_length) / next_sweep_length;
                         }
                     }
                 }
                 else {
                     sound_out[i] = 1.0;
-                    warped_phase = 2.0;
+                    sweep_phase = 2.0;
                 }
             }
         }
@@ -366,10 +370,10 @@ void Squine::next(int nSamples) {
         phase += phase_inc;
 
         // Phase wraparound
-        if (warped_phase >= 2.0 && phase >= 2.0)
+        if (sweep_phase >= 2.0 && phase >= 2.0)
         {
             if (hardsync_phase) {
-                warped_phase = phase = 0.0;
+                sweep_phase = phase = 0.0;
                 hardsync_phase = hardsync_inc = 0.0;
 
                 sync = find_sync(in(3), i, nSamples);
@@ -380,14 +384,14 @@ void Squine::next(int nSamples) {
                     // wild aliasing freq - just reset
                     phase = phase_inc * 0.5;
                 }
-                if (freq < Max_Warp_Freq) {
+                if (freq < Max_Sweep_Freq) {
                     const double min_sweep = phase_inc * Min_Sweep;
                     const double midpoint = Clamp(skew, min_sweep, 2.0 - min_sweep);
                     const double next_sweep_length = fmax(clip * midpoint, min_sweep);
-                    warped_phase = fmin(phase / next_sweep_length, Max_Warp);
+                    sweep_phase = fmin(phase / next_sweep_length, Max_Sweep_Phase);
                 }
                 else
-                    warped_phase = phase;
+                    sweep_phase = phase;
             }
 
             //if (sync_out)
