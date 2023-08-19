@@ -81,7 +81,7 @@ public class SquinewaveOscillator
 		setSync(syn);
 	}
 	
-	public void setFreq(double x) { freq = Clamp(x, 1.0 / 60.0, Max_Freq); }
+	public void setFreq(double x) { freq = Clamp(Math.abs(x), 0, Max_Freq); }
 	public void setSkew(double x) {
 		// Map to 0-2, leftfacing when -1
 		skew = 1 - Clamp(x, -1, 1);
