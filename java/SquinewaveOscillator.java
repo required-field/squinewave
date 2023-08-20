@@ -80,8 +80,8 @@ public class SquinewaveOscillator
 		setSkew(skw);
 		setSync(syn);
 	}
-	
-	public void setFreq(double x) { freq = Clamp(x, 1.0 / 60.0, Max_Freq); }
+
+	public void setFreq(double x) { freq = Clamp(Math.abs(x), 0, Max_Freq); }
 	public void setSkew(double x) {
 		// Map to 0-2, leftfacing when -1
 		skew = 1 - Clamp(x, -1, 1);
@@ -143,21 +143,21 @@ public class SquinewaveOscillator
 			{
 				if (sweep_phase < 1.0) {
 					double sweep_length = Math.max(clip * midpoint, min_sweep);
-	
+
 					audio_out = Math.cos(Math.PI * sweep_phase);
 					sweep_phase += Math.min(phase_inc / sweep_length, Max_Sweep_Inc);
-	
+
 					// Handle fractional sweep_phase overshoot after sweep ends
 					if (sweep_phase > 1.0) {
 						// Tricky here: phase and sweep_phase may disagree where we are in waveform (due to FM + skew/clip changes).
-						// Sweep_phase dominates to keep waveform stable, waveform (flat part) decides where we are. 
+						// Sweep_phase dominates to keep waveform stable, waveform (flat part) decides where we are.
 						double flat_length = midpoint - sweep_length;
 						// sweep_phase overshoot normalized to main phase rate
 						double phase_overshoot = (sweep_phase - 1.0) * sweep_length;
-	
+
 						// phase matches shape
 						phase = midpoint - flat_length + phase_overshoot - phase_inc;
-	
+
 						// Flat if next samp still not at midpoint
 						if (flat_length >= phase_overshoot) {
 							sweep_phase = 1.0;
@@ -186,14 +186,14 @@ public class SquinewaveOscillator
 					}
 					audio_out = Math.cos(Math.PI * sweep_phase);
 					sweep_phase += Math.min(phase_inc / sweep_length, Max_Sweep_Inc);
-	
+
 					if (sweep_phase > 2.0) {
 						double flat_length = 2.0 - (midpoint + sweep_length);
 						double end_length = (2.0 - phase) / phase_inc;
 						double phase_overshoot = (sweep_phase - 2.0) * sweep_length;
-	
+
 						phase = 2.0 - flat_length + phase_overshoot - phase_inc;
-	
+
 						if (flat_length >= phase_overshoot) {
 							sweep_phase = 2.0;
 						}
@@ -265,14 +265,14 @@ public class SquinewaveOscillator
 
 		if (freq > Max_Sync_Freq)
 			return;
-	
+
 		hardsync_inc = Sync_Phase_Inc;
-		hardsync_phase = hardsync_inc * 0.5; 
+		hardsync_phase = hardsync_inc * 0.5;
 	}
 
 
 	// Set full state so waveform starts at specific phase.
-	// Phase range 0-2; the symbolic range covers 
+	// Phase range 0-2; the symbolic range covers
 	//   (0.0-0.5) first sweep down (zero-crossing at 0.25)
 	//   (0.5-1.0) flat low part -1
 	//   (1.0-1.5) 2nd sweep up (zero-crossing at 1.25)
@@ -294,7 +294,7 @@ public class SquinewaveOscillator
 		if (sweep_phase > 2.0)
 			sweep_phase = sweep_phase % 2.0;
 
-		// Select segment and scale within 
+		// Select segment and scale within
 		if (sweep_phase < 1.0) {
 			double sweep_length = Math.max(clip * midpoint, min_sweep);
 			if (sweep_phase < 0.5) {

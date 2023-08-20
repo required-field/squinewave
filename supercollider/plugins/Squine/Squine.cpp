@@ -114,8 +114,8 @@ static inline double Clamp(const double x, const double minval, const double max
     return (x >= minval && x <= maxval) ? x : (x < minval) ? minval : maxval;
 }
 
-// No negative freq (and not mirrored either...)
-#define GET_FREQ(x) fmax(x, 0.0)
+// Just invert negative freqs (RC3, TODO: Invert waveform)
+#define GET_FREQ(x) fabs(x)
 // Inverted to get proportion flat parts
 #define GET_CLIP(x) (1.0 - Clamp((x),  0.0, 1.0))
 // Rescaled to 0-2, to match phase

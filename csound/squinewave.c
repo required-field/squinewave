@@ -151,7 +151,7 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
 
     // Set main phase so it matches sweep_phase
     if (p->init_phase) {
-      const double freq = fmax(freq_sig[0], 0.0);
+      const double freq = fabs(freq_sig[0]);
       const double phase_inc = Maxphase_By_sr * freq;
       const double min_sweep = phase_inc * Min_Sweep;
       const double skew = 1.0 - Clamp(skew_sig[0], -1.0, 1.0);
@@ -204,7 +204,7 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
 
     for (n = ksmps_offset; n < ksmps_end; ++n)
     {
-      double freq = fmax(freq_sig[n], 0.0);
+      double freq = fabs(freq_sig[n]);
 
       if (sync == (int32_t)n) {
         p->phase = phase;
@@ -255,7 +255,7 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
 
                 // Handle fractional sweep_phase overshoot after sweep ends
                 if (sweep_phase > 1.0) {
-                  /* Tricky here: phase and sweep_phase may disagree 
+                  /* Tricky here: phase and sweep_phase may disagree
                    * where we are in waveform (due to FM + skew/clip changes).
                    * Warped dominates to keep waveform stable,
                    * waveform (flat part) decides where we are.
