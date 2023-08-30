@@ -134,7 +134,7 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
     const double Min_Sweep = p->Min_Sweep;
     const double Maxphase_By_sr = p->Maxphase_By_sr;
     const double Max_Sweep_Freq = p->Max_Sweep_Freq;
-    const double Max_Sweep_Inc = 1.0 / p->Min_Sweep;
+    const double Max_Sweep_Inc = 1.0 / Min_Sweep;
     const double Max_Sync_Freq = p->Max_Sync_Freq;
 
     MYFLT *aout = &p->aout[0];
@@ -204,7 +204,8 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
 
     for (n = ksmps_offset; n < ksmps_end; ++n)
     {
-      double freq = fabs(freq_sig[n]);
+      const double raw_freq = freq_sig[n];
+      double freq = fabs(raw_freq);
 
       if (sync == (int32_t)n) {
         p->phase = phase;
@@ -223,6 +224,23 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
         if (hardsync_phase > PI) {
           hardsync_phase = PI;
           hardsync_inc = 0.0;
+        }
+      }
+
+      // Through-Zero modulation: Detect neg freq and zero-crossings
+      {
+        const int zero_crossing = (raw_freq < 0) != neg_freq;
+        if (zero_crossing) {
+          // Jump to opposite side of waveform
+          phase = 1.5 - phase;
+          if (phase < 0) phase += 2.0;
+          // mirror sweep_phase around 1 (cos rad)
+          sweep_phase = 2.0 - sweep_phase;
+        }
+        neg_freq = (raw_freq < 0);
+        if (neg_freq) {
+          // Invert symmetry for backward waveform
+          skew = Clamp(2.0 - skew, 0.0, 2.0);
         }
       }
 
@@ -257,7 +275,7 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
                 if (sweep_phase > 1.0) {
                   /* Tricky here: phase and sweep_phase may disagree
                    * where we are in waveform (due to FM + skew/clip changes).
-                   * Warped dominates to keep waveform stable,
+                   * sweep_phase dominates to keep waveform stable,
                    * waveform (flat part) decides where we are.
                    */
                   const double flat_length = midpoint - sweep_length;
@@ -273,7 +291,7 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
                     sweep_phase = 1.0;
                     // phase may be > midpoint here (which means
                     // actually no flat part), if so it will be
-                    // corrected in 2nd half (since warped == 1.0)
+                    // corrected in 2nd half (since sweep_phase == 1.0)
                   }
                   else {
                     const double next_sweep_length =

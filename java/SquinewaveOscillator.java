@@ -12,6 +12,9 @@ public class SquinewaveOscillator
 	private double clip;
 	private double skew;
 	private boolean sync_in = false;
+	// Through-Zero detection	
+	private double raw_freq;
+	private boolean neg_freq = false;
 
 	// Production values
 	private double audio_out = 0;
@@ -73,7 +76,7 @@ public class SquinewaveOscillator
 	//  Inputs, called before generate()
 	//-------------------------------------------------------------------------------
 
-	// EITHER use this, OR the 4 individual setters
+	// EITHER use this, OR the 4 individual setters, before every call to generate()
 	public void update(double frq, double clp, double skw, double syn) {
 		setFreq(frq);
 		setClip(clp);
@@ -81,7 +84,10 @@ public class SquinewaveOscillator
 		setSync(syn);
 	}
 
-	public void setFreq(double x) { freq = Clamp(Math.abs(x), 0, Max_Freq); }
+	public void setFreq(double x) {
+		freq = Clamp(Math.abs(x), 0, Max_Freq);
+		raw_freq = x;
+	}
 	public void setSkew(double x) {
 		// Map to 0-2, leftfacing when -1
 		skew = 1 - Clamp(x, -1, 1);
@@ -120,6 +126,22 @@ public class SquinewaveOscillator
 			if (hardsync_phase > Math.PI) {
 				hardsync_phase = Math.PI;
 				hardsync_inc = 0.0;
+			}
+		}
+		// Through-Zero modulation: Detect neg freq and zero-crossings
+		{
+			boolean zero_crossing = (raw_freq < 0.0) != neg_freq;
+			if (zero_crossing && hardsync_phase == 0) {
+				// Jump to opposite side of waveform
+				phase = 1.5 - phase;
+				if (phase < 0) phase += 2.0;
+				// mirror sweep_phase around 1 (cos rad)
+				sweep_phase = 2.0 - sweep_phase;
+			}
+			neg_freq = raw_freq < 0.0;
+			if (neg_freq) {
+				// Invert symmetry for backward waveform
+				skew = Clamp(2.0 - skew, 0.0, 2.0);
 			}
 		}
 

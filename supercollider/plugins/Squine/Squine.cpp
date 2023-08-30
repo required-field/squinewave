@@ -91,6 +91,7 @@ private:
     input_param clip_param;
     input_param skew_param;
     bool sync_ar;
+    bool neg_freq;
 
     // phase and sweep_phase range 0-2. This makes skew/clip into simple proportions
     double phase;
@@ -114,8 +115,6 @@ static inline double Clamp(const double x, const double minval, const double max
     return (x >= minval && x <= maxval) ? x : (x < minval) ? minval : maxval;
 }
 
-// Just invert negative freqs (RC3, TODO: Invert waveform)
-#define GET_FREQ(x) fabs(x)
 // Inverted to get proportion flat parts
 #define GET_CLIP(x) (1.0 - Clamp((x),  0.0, 1.0))
 // Rescaled to 0-2, to match phase
@@ -133,13 +132,14 @@ Squine::Squine() {
 
     sync_ar = isAudioRateIn(3);
     hardsync_phase = hardsync_inc = 0;
+	neg_freq = (in0(0) < 0);
 
     // Allow range 4-sr/100, randomize if below (eg zero or -1)
     Min_Sweep = in0(4);
-    if (Min_Sweep < 4 || Min_Sweep > 100) {
+    if (Min_Sweep < 4 || Min_Sweep > 99) {
         // Random value range 5-15
         if (Min_Sweep < 4)
-            Min_Sweep = Clamp(10 * mParent->mRGen->drand() + 5, 5.0, 15);
+            Min_Sweep = Clamp(5 * mParent->mRGen->drand() + 5, 5.0, 10);
         else
             Min_Sweep = 100;
         //Print("Min_Sweep: %f\n", Min_Sweep);
@@ -155,12 +155,11 @@ Squine::Squine() {
     double startphase = in0(5);
     if (startphase) {
         startphase = (startphase < 0 || startphase > 2.0) ? 1.25 : startphase;
-        double freq = GET_FREQ(in0(0));
+        double freq = fabs(in0(0));
         double clip = GET_CLIP(in0(1));
         double skew = GET_SKEW(in0(2));
         init_phase(startphase, freq, clip, skew);
     }
-
 
     mCalcFunc = make_calc_function<Squine, &Squine::next>();
     next(1);
@@ -175,11 +174,8 @@ void Squine::init_phase(const double phase_in, const double freq, const double c
     const double midpoint = Clamp(skew, min_sweep, 2.0 - min_sweep);
 
     // Init phase range 0-2, has 4 segment parts (sweep down, flat -1, sweep up, flat +1)
-    sweep_phase = phase_in;
-    if (sweep_phase < 0.0) {
-        // "up" 0-crossing
-        sweep_phase = 1.25;
-    }
+    double phase = 0.0;
+    double sweep_phase = (phase_in >= 0.0)? phase_in : 1.25;  // "up" 0-crossing
     if (sweep_phase > 2.0)
         sweep_phase = fmod(sweep_phase, 2.0);
 
@@ -208,6 +204,8 @@ void Squine::init_phase(const double phase_in, const double freq, const double c
             sweep_phase = 2.0;
         }
     }
+    this->phase = phase;
+    this->sweep_phase = sweep_phase;
 }
 
 /* ================================================================== */
@@ -225,6 +223,7 @@ static inline int32_t find_sync(const float* sync_sig, const int32_t first, cons
 
 void Squine::hardsync_init(const double freq, const double sweep_phase)
 {
+	static int print;
     // Ignore sync request if already in hardsync
     if (this->hardsync_phase)
         return;
@@ -261,8 +260,9 @@ void Squine::next(int nSamples) {
     } */
 
     for (int32_t i = 0; i < nSamples; ++i) {
-        // Annoying switch on update rate :(
-        double freq = GET_FREQ(freq_param.get_next(i));
+		// Just invert negative freqs (run "backwards" by mirroring the waveform)
+        double raw_freq = freq_param.get_next(i);
+        double freq = fabs(raw_freq);
         double clip = GET_CLIP(clip_param.get_next(i));
         double skew = GET_SKEW(skew_param.get_next(i));
 
@@ -281,6 +281,22 @@ void Squine::next(int nSamples) {
                 hardsync_inc = 0;
             }
         }
+	    // Through-Zero modulation: Detect zero-crossings and neg freq
+        {
+	        bool zero_crossing = (raw_freq < 0) != neg_freq;
+			if (zero_crossing) {
+				// Jump to opposite side of waveform
+				phase = 1.5 - phase;
+				if (phase < 0) phase += 2.0;
+				// mirror sweep_phase around 1 (cos rad)
+				sweep_phase = 2.0 - sweep_phase;
+			}
+			neg_freq = (raw_freq < 0);
+			if (neg_freq) {
+				// Invert symmetry for backward waveform
+				skew = Clamp(2.0 - skew, 0.0, 2.0);
+			}
+		}
 
         const double phase_inc = Maxphase_By_sr * freq;
 
