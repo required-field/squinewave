@@ -22,7 +22,7 @@ CLASSMETHODS::
 METHOD::ar
 
 argument::freq
-Frequency in Herz
+Frequency in Herz. Negative freq leads to waveform running "backwards".
 
 argument::clip
 Squareness of waveform. Range 0.0-1.0
