@@ -1,5 +1,5 @@
 # MOVED TO GITLAB (2023-09-09)
-Unfortunately, Micro$oft has decided to put up massive obstacles to using github, so this repo is now hosted on gitlab:
+Unfortunately, Micro$oft has decided to put up massive obstacles to using github, so this repo is now hosted on gitlab:  
 https://gitlab.com/required-field/squinewave
 
 # Squinewave
