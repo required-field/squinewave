@@ -23,6 +23,7 @@ typedef struct {
     double sweep_phase;
     double hardsync_phase;
     double hardsync_inc;
+    double neg_freq;
 
     // Const inited from environment
     double Min_Sweep;
@@ -144,6 +145,7 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
 
     double phase = p->phase;
     double sweep_phase = p->sweep_phase;
+    double neg_freq = p->neg_freq;
 
     double hardsync_phase = p->hardsync_phase;
     double hardsync_inc = p->hardsync_inc;
@@ -381,6 +383,7 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
     p->sweep_phase = sweep_phase;
     p->hardsync_phase = hardsync_phase;
     p->hardsync_inc = hardsync_inc;
+    p->neg_freq = neg_freq;
     return OK;
 }
 
