@@ -1,6 +1,8 @@
 /* SQUINEWAVE.C: Sine-Square-Pulse-Saw oscillator
 * by rasmus ekman 2017, for Csound.
 *
+* Update 2023:
+* - Through-Zero FM: Run "backwards" on neg freq
 * Update 2021:
 * - Allow fractional Min_Sweep (improves chorusing)
 * - Sharper hardsync when Min_Sweep is high
@@ -23,7 +25,7 @@ typedef struct {
     double sweep_phase;
     double hardsync_phase;
     double hardsync_inc;
-    double neg_freq;
+    int32_t neg_freq;
 
     // Const inited from environment
     double Min_Sweep;
@@ -145,7 +147,7 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
 
     double phase = p->phase;
     double sweep_phase = p->sweep_phase;
-    double neg_freq = p->neg_freq;
+    int32_t neg_freq = p->neg_freq;
 
     double hardsync_phase = p->hardsync_phase;
     double hardsync_inc = p->hardsync_inc;
