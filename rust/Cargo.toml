@@ -1,0 +1,14 @@
+[package]
+name = "squinewave"
+version = "0.9.0"
+authors = ["rasmus"]
+edition = "2021"
+description = "Square-sine-saw-pulse bandlimited morphing oscillator with hardsync"
+# license = "None"
+repository = "https://github.com/required-field/squinewave"
+
+[dependencies]
+# any external crates
+
+[dev-dependencies]
+csv = "*"

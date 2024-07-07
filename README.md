@@ -3,7 +3,8 @@
 Author: rasmus
 
 A sine-square-saw-pulse morphing oscillator with hardsync.  
-Implemented for [CSound](./csound), [SuperCollider](./supercollider), [Voltage Modular](./java).
+Implemented for [CSound](./csound), [SuperCollider](./supercollider), 
+[Voltage Modular](./java), and [Rust](./rust).
 
 Each implementation is basically the same, but in slightly different environments.
 

@@ -1,4 +1,6 @@
 .vimrc
-
 .DS_Store
 build*
+rust/target*
+Cargo.lock
+*.csv
