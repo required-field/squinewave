@@ -77,11 +77,11 @@ public class SquinewaveOscillator
 	//-------------------------------------------------------------------------------
 
 	// EITHER use this, OR the 4 individual setters, before every call to generate()
-	public void update(double frq, double clp, double skw, double syn) {
-		setFreq(frq);
-		setClip(clp);
-		setSkew(skw);
-		setSync(syn);
+	public void update(double freq, double clip, double skew, double sync) {
+		setFreq(freq);
+		setClip(cip);
+		setSkew(skew);
+		setSync(sync);
 	}
 
 	public void setFreq(double x) {
@@ -116,6 +116,7 @@ public class SquinewaveOscillator
 	{
 		if (sync_in) {
 			hardsync_init(freq, sweep_phase);
+			sync_in = false;
 		}
 
 		// hardsync ongoing? Increase freq until wraparound
@@ -161,74 +162,71 @@ public class SquinewaveOscillator
 			double midpoint = Clamp(skew, min_sweep, 2.0 - min_sweep);
 
 			// 1st half: Sweep down to cos(sweep_phase <= Pi) then flat -1 until phase >= midpoint
-			if (sweep_phase < 1.0 || (sweep_phase == 1.0 && phase < midpoint))
+			if (sweep_phase < 1.0)
 			{
-				if (sweep_phase < 1.0) {
-					double sweep_length = Math.max(clip * midpoint, min_sweep);
+				double sweep_length = Math.max(clip * midpoint, min_sweep);
 
-					audio_out = Math.cos(Math.PI * sweep_phase);
-					sweep_phase += Math.min(phase_inc / sweep_length, Max_Sweep_Inc);
+				audio_out = Math.cos(Math.PI * sweep_phase);
+				sweep_phase += Math.min(phase_inc / sweep_length, Max_Sweep_Inc);
 
-					// Handle fractional sweep_phase overshoot after sweep ends
-					if (sweep_phase > 1.0) {
-						// Tricky here: phase and sweep_phase may disagree where we are in waveform (due to FM + skew/clip changes).
-						// Sweep_phase dominates to keep waveform stable, waveform (flat part) decides where we are.
-						double flat_length = midpoint - sweep_length;
-						// sweep_phase overshoot normalized to main phase rate
-						double phase_overshoot = (sweep_phase - 1.0) * sweep_length;
+				// Handle fractional sweep_phase overshoot after sweep ends
+				if (sweep_phase > 1.0) {
+					// Tricky here: phase and sweep_phase may disagree where we are in waveform (due to FM + skew/clip changes).
+					// Sweep_phase dominates to keep waveform stable, waveform (flat part) decides where we are.
+					double flat_length = midpoint - sweep_length;
+					// sweep_phase overshoot normalized to main phase rate
+					double phase_overshoot = (sweep_phase - 1.0) * sweep_length;
 
-						// phase matches shape
-						phase = midpoint - flat_length + phase_overshoot - phase_inc;
+					// phase matches shape
+					phase = midpoint - flat_length + phase_overshoot - phase_inc;
 
-						// Flat if next samp still not at midpoint
-						if (flat_length >= phase_overshoot) {
-							sweep_phase = 1.0;
-							// phase may be > midpoint here (which means actually no flat part),
-							// if so it will be corrected in 2nd half (since sweep_phase == 1.0)
-						}
-						else {
-							double next_sweep_length = Math.max(clip * (2.0 - midpoint), min_sweep);
-							sweep_phase = 1.0 + (phase_overshoot - flat_length) / next_sweep_length;
-						}
+					// Flat if next samp still not at midpoint
+					if (flat_length >= phase_overshoot) {
+						sweep_phase = 1.0;
+						// phase may be > midpoint here (which means actually no flat part),
+						// if so it will be corrected in 2nd half (since sweep_phase == 1.0)
 					}
-				}
-				else {
-					// flat until midpoint
-					audio_out = -1.0;
-					sweep_phase = 1.0;
+					else {
+						double next_sweep_length = Math.max(clip * (2.0 - midpoint), min_sweep);
+						sweep_phase = 1.0 + (phase_overshoot - flat_length) / next_sweep_length;
+					}
 				}
 			}
+			// flat until midpoint
+			else if (sweep_phase == 1.0 && phase < midpoint) {
+				audio_out = -1.0;
+				sweep_phase = 1.0;
+			}
+
 			// 2nd half: Sweep up to cos(sweep_phase <= 2.Pi) then flat +1 until phase >= 2
+			else if (sweep_phase < 2.0) {
+				double sweep_length = Math.max(clip * (2.0 - midpoint), min_sweep);
+				if (sweep_phase == 1.0) {
+					// sweep_phase overshoot after flat part
+					sweep_phase = 1.0 + Math.min( Math.min(phase - midpoint, phase_inc) / sweep_length, Max_Sweep_Inc);
+				}
+				audio_out = Math.cos(Math.PI * sweep_phase);
+				sweep_phase += Math.min(phase_inc / sweep_length, Max_Sweep_Inc);
+
+				if (sweep_phase > 2.0) {
+					double flat_length = 2.0 - (midpoint + sweep_length);
+					double phase_overshoot = (sweep_phase - 2.0) * sweep_length;
+
+					phase = 2.0 - flat_length + phase_overshoot - phase_inc;
+
+					if (flat_length >= phase_overshoot) {
+						sweep_phase = 2.0;
+					}
+					else {
+						double next_sweep_length = Math.max(clip * midpoint, min_sweep);
+						sweep_phase = 2.0 + (phase_overshoot - flat_length) / next_sweep_length;
+					}
+				}
+			}
+			// flat until endpoint
 			else {
-				if (sweep_phase < 2.0) {
-					double sweep_length = Math.max(clip * (2.0 - midpoint), min_sweep);
-					if (sweep_phase == 1.0) {
-						// sweep_phase overshoot after flat part
-						sweep_phase = 1.0 + Math.min( Math.min(phase - midpoint, phase_inc) / sweep_length, Max_Sweep_Inc);
-					}
-					audio_out = Math.cos(Math.PI * sweep_phase);
-					sweep_phase += Math.min(phase_inc / sweep_length, Max_Sweep_Inc);
-
-					if (sweep_phase > 2.0) {
-						double flat_length = 2.0 - (midpoint + sweep_length);
-						double end_length = (2.0 - phase) / phase_inc;
-						double phase_overshoot = (sweep_phase - 2.0) * sweep_length;
-
-						phase = 2.0 - flat_length + phase_overshoot - phase_inc;
-
-						if (flat_length >= phase_overshoot) {
-							sweep_phase = 2.0;
-						}
-						else {
-							double next_sweep_length = Math.max(clip * midpoint, min_sweep);
-							sweep_phase = 2.0 + (phase_overshoot - flat_length) / next_sweep_length;
-						}
-					}
-				}
-				else {
-					audio_out = 1.0;
-					sweep_phase = 2.0;
-				}
+				audio_out = 1.0;
+				sweep_phase = 2.0;
 			}
 		}
 
@@ -256,13 +254,15 @@ public class SquinewaveOscillator
 					double next_sweep_length = Math.max(clip * midpoint, min_sweep);
 					sweep_phase = Math.min(phase / next_sweep_length, Max_Sweep_Inc);
 				}
-				else
+				else {
 					sweep_phase = phase;
+				}
 			}
 			sync_out = 1.0;
 		}
-		else
+		else {
 			sync_out = 0;
+		}
 	}
 
 

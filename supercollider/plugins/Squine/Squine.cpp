@@ -312,75 +312,71 @@ void Squine::next(int nSamples) {
             const double midpoint = Clamp(skew, min_sweep, 2.0 - min_sweep);
 
             // 1st half: Sweep down to cos(sweep_phase <= pi) then flat -1 until phase >= midpoint
-            if (sweep_phase < 1.0 || (sweep_phase == 1.0 && phase < midpoint))
-            {
-                if (sweep_phase < 1.0) {
-                    const double sweep_length = fmax(clip * midpoint, min_sweep);
+			if (sweep_phase < 1.0) {
+				const double sweep_length = fmax(clip * midpoint, min_sweep);
 
-                    sound_out[i] = static_cast<float>( cos(pi * sweep_phase) );
-                    sweep_phase += fmin(phase_inc / sweep_length, Max_Sweep_Inc);
+				sound_out[i] = static_cast<float>( cos(pi * sweep_phase) );
+				sweep_phase += fmin(phase_inc / sweep_length, Max_Sweep_Inc);
 
-                    // Handle fractional sweep_phase overshoot after sweep ends
-                    if (sweep_phase > 1.0) {
-                        /* Tricky here: phase and sweep_phase may disagree where we are in waveform (due to FM + skew/clip changes).
-                         * Sweep_phase dominates to keep waveform stable, waveform (flat part) decides where we are.
-                         */
-                        const double flat_length = midpoint - sweep_length;
-                        // sweep_phase overshoot scaled to main phase rate
-                        const double phase_overshoot = (sweep_phase - 1.0) * sweep_length;
+				// Handle fractional sweep_phase overshoot after sweep ends
+				if (sweep_phase > 1.0) {
+					/* Tricky here: phase and sweep_phase may disagree where we are in waveform (due to FM + skew/clip changes).
+					 * Sweep_phase dominates to keep waveform stable, waveform (flat part) decides where we are.
+					 */
+					const double flat_length = midpoint - sweep_length;
+					// sweep_phase overshoot scaled to main phase rate
+					const double phase_overshoot = (sweep_phase - 1.0) * sweep_length;
 
-                        // phase matches shape
-                        phase = midpoint - flat_length + phase_overshoot - phase_inc;
+					// phase matches shape
+					phase = midpoint - flat_length + phase_overshoot - phase_inc;
 
-                        // Flat if next samp still not at midpoint
-                        if (flat_length >= phase_overshoot) {
-                            sweep_phase = 1.0;
-                            // phase may be > midpoint here (which means actually no flat part),
-                            // if so it will be corrected in 2nd half (since sweep_phase == 1.0)
-                        }
-                        else {
-                            const double next_sweep_length = fmax(clip * (2.0 - midpoint), min_sweep);
-                            sweep_phase = 1.0 + (phase_overshoot - flat_length) / next_sweep_length;
-                        }
-                    }
-                }
-                else {
-                    // flat up to midpoint
-                    sound_out[i] = -1.0;
-                    sweep_phase = 1.0;
-                }
-            }
+					// Flat if next samp still not at midpoint
+					if (flat_length >= phase_overshoot) {
+						sweep_phase = 1.0;
+						// phase may be > midpoint here (which means actually no flat part),
+						// if so it will be corrected in 2nd half (since sweep_phase == 1.0)
+					}
+					else {
+						const double next_sweep_length = fmax(clip * (2.0 - midpoint), min_sweep);
+						sweep_phase = 1.0 + (phase_overshoot - flat_length) / next_sweep_length;
+					}
+				}
+			}
+			// flat up to midpoint
+			else if (sweep_phase == 1.0 && phase < midpoint) {
+				sound_out[i] = -1.0;
+				sweep_phase = 1.0;
+			}
             // 2nd half: Sweep up to cos(sweep_phase <= 2.pi) then flat +1 until phase >= 2
-            else {
-                if (sweep_phase < 2.0) {
-                    const double sweep_length = fmax(clip * (2.0 - midpoint), min_sweep);
-                    if (sweep_phase == 1.0) {
-                        // sweep_phase overshoot after flat part
-                        sweep_phase = 1.0 + fmin( fmin(phase - midpoint, phase_inc) / sweep_length, Max_Sweep_Inc);
-                    }
-                    sound_out[i] = static_cast<float>( cos(pi * sweep_phase) );
-                    sweep_phase += fmin(phase_inc / sweep_length, Max_Sweep_Inc);
+            else if (sweep_phase < 2.0) {
+				const double sweep_length = fmax(clip * (2.0 - midpoint), min_sweep);
+				if (sweep_phase == 1.0) {
+					// sweep_phase overshoot after flat part
+					sweep_phase = 1.0 + fmin( fmin(phase - midpoint, phase_inc) / sweep_length, Max_Sweep_Inc);
+				}
+				sound_out[i] = static_cast<float>( cos(pi * sweep_phase) );
+				sweep_phase += fmin(phase_inc / sweep_length, Max_Sweep_Inc);
 
-                    if (sweep_phase > 2.0) {
-                        const double flat_length = 2.0 - (midpoint + sweep_length);
-                        const double phase_overshoot = (sweep_phase - 2.0) * sweep_length;
+				if (sweep_phase > 2.0) {
+					const double flat_length = 2.0 - (midpoint + sweep_length);
+					const double phase_overshoot = (sweep_phase - 2.0) * sweep_length;
 
-                        phase = 2.0 - flat_length + phase_overshoot - phase_inc;
+					phase = 2.0 - flat_length + phase_overshoot - phase_inc;
 
-                        if (flat_length >= phase_overshoot) {
-                            sweep_phase = 2.0;
-                        }
-                        else {
-                            const double next_sweep_length = fmax(clip * midpoint, min_sweep);
-                            sweep_phase = 2.0 + (phase_overshoot - flat_length) / next_sweep_length;
-                        }
-                    }
-                }
-                else {
-                    sound_out[i] = 1.0;
-                    sweep_phase = 2.0;
-                }
-            }
+					if (flat_length >= phase_overshoot) {
+						sweep_phase = 2.0;
+					}
+					else {
+						const double next_sweep_length = fmax(clip * midpoint, min_sweep);
+						sweep_phase = 2.0 + (phase_overshoot - flat_length) / next_sweep_length;
+					}
+				}
+			}
+			// flat until endpoint
+			else {
+				sound_out[i] = 1.0;
+				sweep_phase = 2.0;
+			}
         }
 
         phase += phase_inc;
