@@ -193,8 +193,7 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
         }
         else {
           const double flat_length = 2.0 - (midpoint + sweep_length);
-          phase = midpoint + sweep_length +
-            flat_length * ((sweep_phase - 1.5) * 2.0);
+          phase = midpoint + sweep_length + flat_length * ((sweep_phase - 1.5) * 2.0);
           sweep_phase = 2.0;
         }
       }
@@ -252,102 +251,92 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
 
       // Pure sine if freq > sr/(2*Min_Sweep)
       if (freq >= Max_Sweep_Freq)
-        {
-          // Continue from sweep_phase
-          *aout++ = cos(PI * sweep_phase);
-          phase = sweep_phase;
-          sweep_phase += phase_inc;
-        }
+      {
+        // Continue from sweep_phase
+        *aout++ = cos(PI * sweep_phase);
+        phase = sweep_phase;
+        sweep_phase += phase_inc;
+      }
       else
+      {
+        const double min_sweep = phase_inc * Min_Sweep;
+        const double skew = 1.0 - Clamp(skew_sig[n], -1.0, 1.0);
+        const double clip = 1.0 - Clamp(clip_sig[n], 0.0, 1.0);
+        const double midpoint = Clamp(skew, min_sweep, 2.0 - min_sweep);
+
+        // 1st half: Sweep down to cos(sweep_phase <= Pi) then
+        // flat -1 until phase >= midpoint
+        if (sweep_phase < 1.0)
         {
-          const double min_sweep = phase_inc * Min_Sweep;
-          const double skew = 1.0 - Clamp(skew_sig[n], -1.0, 1.0);
-          const double clip = 1.0 - Clamp(clip_sig[n], 0.0, 1.0);
-          const double midpoint = Clamp(skew, min_sweep, 2.0 - min_sweep);
+          const double sweep_length = fmax(clip * midpoint, min_sweep);
 
-          // 1st half: Sweep down to cos(sweep_phase <= Pi) then
-          // flat -1 until phase >= midpoint
-          if (sweep_phase < 1.0 || (sweep_phase == 1.0 && phase < midpoint))
-            {
-              if (sweep_phase < 1.0) {
-                const double sweep_length = fmax(clip * midpoint, min_sweep);
+          *aout++ = cos(PI * sweep_phase);
+          sweep_phase += fmin(phase_inc / sweep_length, Max_Sweep_Inc);
 
-                *aout++ = cos(PI * sweep_phase);
-                sweep_phase += fmin(phase_inc / sweep_length, Max_Sweep_Inc);
+          // Handle fractional sweep_phase overshoot after sweep ends
+          if (sweep_phase > 1.0) {
+            /* Tricky here: phase and sweep_phase may disagree
+              * where we are in waveform (due to FM + skew/clip changes).
+              * sweep_phase dominates to keep waveform stable,
+              * waveform (flat part) decides where we are.
+              */
+            const double flat_length = midpoint - sweep_length;
+            // sweep_phase overshoot scaled to main phase rate
+            const double phase_overshoot = (sweep_phase - 1.0) * sweep_length;
 
-                // Handle fractional sweep_phase overshoot after sweep ends
-                if (sweep_phase > 1.0) {
-                  /* Tricky here: phase and sweep_phase may disagree
-                   * where we are in waveform (due to FM + skew/clip changes).
-                   * sweep_phase dominates to keep waveform stable,
-                   * waveform (flat part) decides where we are.
-                   */
-                  const double flat_length = midpoint - sweep_length;
-                  // sweep_phase overshoot scaled to main phase rate
-                  const double phase_overshoot =
-                    (sweep_phase - 1.0) * sweep_length;
+            // phase matches shape
+            phase = midpoint - flat_length + phase_overshoot - phase_inc;
 
-                  // phase matches shape
-                  phase = midpoint - flat_length + phase_overshoot - phase_inc;
-
-                  // Flat if next samp still not at midpoint
-                  if (flat_length >= phase_overshoot) {
-                    sweep_phase = 1.0;
-                    // phase may be > midpoint here (which means
-                    // actually no flat part), if so it will be
-                    // corrected in 2nd half (since sweep_phase == 1.0)
-                  }
-                  else {
-                    const double next_sweep_length =
-                      fmax(clip * (2.0 - midpoint), min_sweep);
-                    sweep_phase =
-                      1.0 + (phase_overshoot - flat_length) / next_sweep_length;
-                  }
-                }
-              }
-              else {
-                // flat up to midpoint
-                *aout++ = -1.0;
-                sweep_phase = 1.0;
-              }
+            // Flat if next samp still not at midpoint
+            if (flat_length >= phase_overshoot) {
+              sweep_phase = 1.0;
+              // phase may be > midpoint here (which means actually no flat part), 
+              // if so it will be corrected in 2nd half (since sweep_phase == 1.0)
             }
-            // 2nd half: Sweep up to cos(sweep_phase <= 2.Pi) then
-            // flat +1 until phase >= 2
             else {
-              if (sweep_phase < 2.0) {
-                const double sweep_length =
-                  fmax(clip * (2.0 - midpoint), min_sweep);
-                if (sweep_phase == 1.0) {
-                  // sweep_phase overshoot after flat part
-                  sweep_phase = 1.0 + fmin( fmin(phase - midpoint, phase_inc) /
-                                             sweep_length, Max_Sweep_Inc);
-                }
-                *aout++ = cos(PI * sweep_phase);
-                sweep_phase += fmin(phase_inc / sweep_length, Max_Sweep_Inc);
-                if (sweep_phase > 2.0) {
-                  const double flat_length = 2.0 - (midpoint + sweep_length);
-                  const double phase_overshoot =
-                    (sweep_phase - 2.0) * sweep_length;
-
-                  phase = 2.0 - flat_length + phase_overshoot - phase_inc;
-
-                  if (flat_length >= phase_overshoot) {
-                    sweep_phase = 2.0;
-                  }
-                  else {
-                    const double next_sweep_length =
-                      fmax(clip * midpoint, min_sweep);
-                    sweep_phase =
-                      2.0 + (phase_overshoot - flat_length) / next_sweep_length;
-                  }
-                }
-              }
-              else {
-                *aout++ = 1.0;
-                sweep_phase = 2.0;
-              }
+              const double next_sweep_length = fmax(clip * (2.0 - midpoint), min_sweep);
+              sweep_phase = 1.0 + (phase_overshoot - flat_length) / next_sweep_length;
             }
+          }
         }
+        // flat up to midpoint
+        else if (sweep_phase == 1.0 && phase < midpoint) {
+          *aout++ = -1.0;
+        }
+
+        // 2nd half: Sweep up to cos(sweep_phase <= 2.Pi), 
+        // then flat +1 until phase >= 2
+        else if (sweep_phase < 2.0)
+        {
+          const double sweep_length = fmax(clip * (2.0 - midpoint), min_sweep);
+          if (sweep_phase == 1.0) {
+            // sweep_phase overshoot after flat part
+            sweep_phase = 1.0 + fmin( fmin(phase - midpoint, phase_inc) /
+                                        sweep_length, Max_Sweep_Inc);
+          }
+          *aout++ = cos(PI * sweep_phase);
+          sweep_phase += fmin(phase_inc / sweep_length, Max_Sweep_Inc);
+          if (sweep_phase > 2.0) {
+            const double flat_length = 2.0 - (midpoint + sweep_length);
+            const double phase_overshoot = (sweep_phase - 2.0) * sweep_length;
+
+            phase = 2.0 - flat_length + phase_overshoot - phase_inc;
+
+            if (flat_length >= phase_overshoot) {
+              sweep_phase = 2.0;
+            }
+            else {
+              const double next_sweep_length = fmax(clip * midpoint, min_sweep);
+              sweep_phase = 2.0 + (phase_overshoot - flat_length) / next_sweep_length;
+            }
+          }
+        }
+        // flat until endpoint
+        else {
+          *aout++ = 1.0;
+          sweep_phase = 2.0;
+        }
+      }
 
       phase += phase_inc;
       if (sweep_phase >= 2.0 && phase >= 2.0)

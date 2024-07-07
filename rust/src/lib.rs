@@ -222,7 +222,6 @@ impl Squinewave {
 			// flat until midpoint
 			else if self.sweep_phase == 1.0 && self.phase < midpoint {
 				self.audio_out = -1.0;
-				self.sweep_phase = 1.0;
 			}
 
 			// 2nd half: Sweep up to cos(sweep_phase <= 2.Pi) then flat +1 until phase >= 2

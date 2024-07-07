@@ -345,7 +345,6 @@ void Squine::next(int nSamples) {
 			// flat up to midpoint
 			else if (sweep_phase == 1.0 && phase < midpoint) {
 				sound_out[i] = -1.0;
-				sweep_phase = 1.0;
 			}
             // 2nd half: Sweep up to cos(sweep_phase <= 2.pi) then flat +1 until phase >= 2
             else if (sweep_phase < 2.0) {

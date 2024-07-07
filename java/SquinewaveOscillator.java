@@ -195,7 +195,6 @@ public class SquinewaveOscillator
 			// flat until midpoint
 			else if (sweep_phase == 1.0 && phase < midpoint) {
 				audio_out = -1.0;
-				sweep_phase = 1.0;
 			}
 
 			// 2nd half: Sweep up to cos(sweep_phase <= 2.Pi) then flat +1 until phase >= 2
