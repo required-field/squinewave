@@ -10,8 +10,11 @@
 
 #include <math.h>
 
+#ifdef BUILD_PLUGINS
+#include "csdl.h"
+#else
 #include "csoundCore.h"
-
+#endif
 
 /* ================================================================== */
 
@@ -90,7 +93,7 @@ static inline MYFLT Clamp(const MYFLT x, const MYFLT minval, const MYFLT maxval)
 
 int32_t squinewave_init(CSOUND* csound, SQUINEWAVE *p)
 {
-    const double sr = csound->GetSr(csound);
+    const double sr = CS_ESR;
 
     // Skip setting phase only if we have been inited at least once
     p->init_phase = (*p->iphase < 0 && p->Min_Sweep > 1.0) ? 0 : 1;
@@ -387,9 +390,9 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
 
 static OENTRY squinewave_localops[] =
   {
-   { "squinewave", sizeof(SQUINEWAVE), 0, 3, "am", "aaaaoj",
+   { "squinewave", sizeof(SQUINEWAVE), 0,  "am", "aaaaoj",
      (SUBR)squinewave_init, (SUBR)squinewave_gen },
-   { "squinewave", sizeof(SQUINEWAVE), 0, 3, "am", "aaaOoj",
+   { "squinewave", sizeof(SQUINEWAVE), 0,  "am", "aaaOoj",
      (SUBR)squinewave_init, (SUBR)squinewave_gen },
 };
 
