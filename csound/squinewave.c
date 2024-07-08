@@ -159,7 +159,7 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
     // Set main phase so it matches sweep_phase
     if (p->init_phase) {
       const double freq = fabs(freq_sig[0]);
-      const double phase_inc = Maxphase_By_sr * freq;
+      const double phase_inc = freq * Maxphase_By_sr;
       const double min_sweep = phase_inc * Min_Sweep;
       const double skew = 1.0 - Clamp(skew_sig[0], -1.0, 1.0);
       const double clip = 1.0 - Clamp(clip_sig[0], 0.0, 1.0);
@@ -244,13 +244,9 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
           sweep_phase = 2.0 - sweep_phase;
         }
         neg_freq = (raw_freq < 0);
-        if (neg_freq) {
-          // Invert symmetry for backward waveform
-          skew = Clamp(2.0 - skew, 0.0, 2.0);
-        }
       }
 
-      const double phase_inc = Maxphase_By_sr * freq;
+      const double phase_inc = freq * Maxphase_By_sr;
 
       // Pure sine if freq > sr/(2*Min_Sweep)
       if (freq >= Max_Sweep_Freq)
@@ -263,8 +259,9 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
       else
       {
         const double min_sweep = phase_inc * Min_Sweep;
-        const double skew = 1.0 - Clamp(skew_sig[n], -1.0, 1.0);
         const double clip = 1.0 - Clamp(clip_sig[n], 0.0, 1.0);
+        // If neg_freq, invert symmetry for backward waveform
+        const double skew = 1.0 - Clamp( (neg_freq)? -skew_sig[n] : skew_sig[n], -1.0, 1.0);
         const double midpoint = Clamp(skew, min_sweep, 2.0 - min_sweep);
 
         // 1st half: Sweep down to cos(sweep_phase <= Pi) then
@@ -358,8 +355,8 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
               }
               if (freq < Max_Sweep_Freq) {
                 const double min_sweep = phase_inc * Min_Sweep;
-                const double skew = 1.0 - Clamp(skew_sig[n], -1.0, 1.0);
                 const double clip = 1.0 - Clamp(clip_sig[n], 0.0, 1.0);
+                const double skew = 1.0 - Clamp( (neg_freq)? -skew_sig[n] : skew_sig[n], -1.0, 1.0);
                 const double midpoint = Clamp(skew, min_sweep, 2.0 - min_sweep);
                 const double next_sweep_length = fmax(clip * midpoint, min_sweep);
                 sweep_phase = fmin(phase / next_sweep_length, Max_Sweep_Inc);
