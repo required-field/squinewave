@@ -16,6 +16,7 @@
 #include "csoundCore.h"
 #endif
 
+
 /* ================================================================== */
 
 typedef struct {
@@ -23,7 +24,7 @@ typedef struct {
     MYFLT *aout, *async_out, *acps, *aclip, *askew, *async_in, *iminsweep, *iphase;
 
     // phase and sweep_phase range 0-2.
-    // This makes skew/clip into simple proportions
+    // This makes clip/skew into simple proportions
     double phase;
     double sweep_phase;
     double hardsync_phase;
@@ -276,7 +277,7 @@ int32_t squinewave_gen(CSOUND* csound, SQUINEWAVE *p)
           // Handle fractional sweep_phase overshoot after sweep ends
           if (sweep_phase > 1.0) {
             /* Tricky here: phase and sweep_phase may disagree
-              * where we are in waveform (due to FM + skew/clip changes).
+              * where we are in waveform (due to FM + clip/skew changes).
               * sweep_phase dominates to keep waveform stable,
               * waveform (flat part) decides where we are.
               */
